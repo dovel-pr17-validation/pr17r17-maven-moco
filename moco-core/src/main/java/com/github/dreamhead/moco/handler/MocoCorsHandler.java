@@ -1,0 +1,96 @@
+package com.github.dreamhead.moco.handler;
+
+import com.github.dreamhead.moco.HttpMethod;
+import com.github.dreamhead.moco.HttpRequest;
+import com.github.dreamhead.moco.MutableHttpResponse;
+import com.github.dreamhead.moco.handler.cors.CorsConfig;
+import com.github.dreamhead.moco.util.Strings;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Set;
+import java.util.function.Predicate;
+
+public final class MocoCorsHandler extends AbstractHttpResponseHandler {
+    private final CorsConfig[] configs;
+
+    public MocoCorsHandler(final CorsConfig[] configs) {
+        this.configs = configs;
+    }
+
+    @Override
+    protected void doWriteToResponse(final HttpRequest httpRequest, final MutableHttpResponse httpResponse) {
+        String requestOrigin = httpRequest.getHeader("Origin");
+        if (Strings.isNullOrEmpty(requestOrigin)) {
+            return;
+        }
+
+        if (isSimpleRequest(httpRequest)) {
+            writeSimpleResponse(httpRequest, httpResponse, CorsConfig::isSimpleRequestConfig);
+            return;
+        }
+
+        if (httpRequest.getMethod() == HttpMethod.OPTIONS) {
+            writeOptionResponse(httpRequest, httpResponse);
+            return;
+        }
+
+        writeNoSimpleResponse(httpRequest, httpResponse);
+    }
+
+    private void writeOptionResponse(final HttpRequest httpRequest, final MutableHttpResponse httpResponse) {
+        if (configs.length == 0) {
+            writeDefaultAllowHeaders(httpResponse);
+            return;
+        }
+
+        writeCorsResponse(httpRequest, httpResponse, CorsConfig::isNonSimpleRequestConfig, false);
+    }
+
+    private void writeNoSimpleResponse(final HttpRequest httpRequest, final MutableHttpResponse httpResponse) {
+        if (configs.length == 0) {
+            writeDefaultAllowHeaders(httpResponse);
+            return;
+        }
+
+        writeCorsResponse(httpRequest, httpResponse, CorsConfig::isNonSimpleRequestConfig, true);
+    }
+
+    private static void writeDefaultAllowHeaders(final MutableHttpResponse httpResponse) {
+        httpResponse.addHeader("Access-Control-Allow-Origin", "*");
+        httpResponse.addHeader("Access-Control-Allow-Methods", "*");
+        httpResponse.addHeader("Access-Control-Allow-Headers", "*");
+    }
+
+    private void writeSimpleResponse(final HttpRequest httpRequest, final MutableHttpResponse httpResponse, final Predicate<CorsConfig> isSimpleRequestConfig) {
+        if (configs.length == 0) {
+            httpResponse.addHeader("Access-Control-Allow-Origin", "*");
+            return;
+        }
+
+        writeCorsResponse(httpRequest, httpResponse, isSimpleRequestConfig, true);
+    }
+
+    private void writeCorsResponse(final HttpRequest httpRequest, final MutableHttpResponse httpResponse,
+                                   final Predicate<CorsConfig> requestPredicate, final boolean isQualified) {
+        List<CorsConfig> filteredConfigs = Arrays.stream(configs)
+                .filter(requestPredicate)
+                .toList();
+
+        if (isQualified && !filteredConfigs.stream().allMatch(config -> config.isQualified(httpRequest))) {
+            return;
+        }
+
+        for (CorsConfig config : filteredConfigs) {
+            config.configure(httpResponse);
+        }
+    }
+
+    private static final Set<HttpMethod> SIMPLE_REQUEST_METHODS
+            = Set.of(HttpMethod.GET, HttpMethod.HEAD, HttpMethod.POST);
+
+    private boolean isSimpleRequest(final HttpRequest httpRequest) {
+        HttpMethod method = httpRequest.getMethod();
+        return SIMPLE_REQUEST_METHODS.contains(method);
+    }
+}

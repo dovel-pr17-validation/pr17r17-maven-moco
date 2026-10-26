@@ -1,0 +1,30 @@
+package com.github.dreamhead.moco.matcher;
+
+import com.github.dreamhead.moco.Request;
+import com.github.dreamhead.moco.RequestExtractor;
+import com.github.dreamhead.moco.RequestMatcher;
+import com.github.dreamhead.moco.internal.ContextKey;
+import com.github.dreamhead.moco.internal.SessionContext;
+import com.github.dreamhead.moco.resource.Resource;
+import com.github.dreamhead.moco.util.AntPathMatcher;
+
+public class PathMatcher<T> extends AbstractOperatorMatcher<T> {
+    private static final AntPathMatcher PATH_MATCHER = AntPathMatcher.create();
+
+    public PathMatcher(final RequestExtractor<T> extractor, final Resource expected) {
+        super(extractor, expected, input -> {
+            final String target = expected.readFor((Request) null).toString();
+            return PATH_MATCHER.match(target, input);
+        });
+    }
+
+    @Override
+    public final void attach(final SessionContext context) {
+        context.register(ContextKey.PATH, getExpected());
+    }
+
+    @Override
+    protected final RequestMatcher newMatcher(final RequestExtractor<T> extractor, final Resource resource) {
+        return new PathMatcher<>(extractor, resource);
+    }
+}

@@ -1,0 +1,32 @@
+[
+  {
+    "websocket": {
+      "uri": "/ws",
+      "connected": "connected",
+      "pingpongs": [
+        {
+          "ping": "ping",
+          "pong": "pong"
+        }
+      ],
+      "sessions": [
+        {
+          "request": {
+            "text": "foo"
+          },
+          "response": {
+            "text": "bar"
+          }
+        },
+        {
+          "request": {
+            "file": "src/test/resources/foo.request"
+          },
+          "response": {
+            "file": "src/test/resources/foo.response"
+          }
+        }
+      ]
+    }
+  }
+]

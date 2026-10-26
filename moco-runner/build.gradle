@@ -1,0 +1,119 @@
+buildscript {
+    repositories {
+        mavenCentral()
+        google()
+    }
+
+    dependencies {
+        classpath "com.guardsquare:proguard-gradle:$proguardVersion"
+    }
+}
+
+plugins {
+    id 'moco-java-conventions'
+    id 'moco-testing-conventions'
+}
+
+apply from: rootProject.file('moco-publishing.gradle')
+
+evaluationDependsOn(':moco-core')
+
+def coreTestOutput = project(':moco-core').sourceSets.test.output
+def coreTestResources = project(':moco-core').sourceSets.test.resources
+def runnerMainResources = sourceSets.main.resources
+
+dependencies {
+    api(project(':moco-core'))
+    implementation(libs.netty.handler)
+    implementation(libs.jackson.databind)
+    implementation(libs.slf4j.api)
+    implementation(libs.commons.cli)
+
+    runtimeOnly(libs.tinylog.slf4j)
+    runtimeOnly(libs.tinylog.impl)
+
+    testImplementation(libs.hamcrest.core)
+    testImplementation(libs.hamcrest.library)
+    testImplementation(libs.mockito.core)
+    testImplementation(libs.httpclient.fluent)
+    testImplementation(libs.jsonassert)
+    testImplementation(libs.websocket.api)
+
+    testImplementation(coreTestOutput)
+    testRuntimeOnly(coreTestResources)
+    testRuntimeOnly(runnerMainResources)
+    testRuntimeOnly(libs.tyrus.client)
+}
+
+task uberjar(type: Jar, dependsOn: jar) {
+    archiveClassifier = 'uber'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    exclude('META-INF/maven/**')
+    exclude('META-INF/native-image/**')
+    exclude('mozilla/**')
+    exclude('org/tinylog/implementation/**')
+    exclude('META-INF/maven/org.tinylog/**')
+    exclude('freemarker/ext/jython/**')
+
+    from files(project(':moco-core').sourceSets.main.output.classesDirs)
+    from files(sourceSets.main.output.classesDirs)
+    from files(sourceSets.main.output.resourcesDir)
+    from configurations.runtimeClasspath.asFileTree.files.collect { zipTree(it) }
+
+    manifest {
+        attributes 'Main-Class': 'com.github.dreamhead.moco.bootstrap.Main',
+                'Package': "com.github.dreamhead",
+                'Implementation-Title': "${project.name}",
+                'Implementation-Version': "${archiveVersion.get()}",
+                'Implementation-Vendor': 'Zheng Ye',
+                'Built-By': 'Zheng Ye',
+                'Built-Date': new Date().getDateTimeString(),
+                'Built-With': "gradle-${project.getGradle().getGradleVersion()}, groovy-${GroovySystem.getVersion()}",
+                'Created-By': 'Java ' + System.getProperty('java.version') + ' (' + System.getProperty('java.vendor') + ')'
+    }
+}
+
+task proguard(type: proguard.gradle.ProGuardTask, dependsOn: uberjar) {
+    injars uberjar.archiveFile.get()
+    outjars uberjar.archiveFile.get().toString().replace(uberjar.archiveClassifier.get(), 'standalone')
+    libraryjars javaModPath()
+
+    configuration file("$rootDir/proguard.pro")
+}
+
+task proguardCheck(type: Test, dependsOn: proguard) {
+    testLogging { exceptionFormat = "full" }
+
+    testClassesDirs = sourceSets.test.output.classesDirs
+    useJUnitPlatform()
+
+    classpath = findTestJar('httpclient5') +
+            findTestJar('httpclient5-fluent') +
+            findTestJar('httpcore5') +
+            files(proguard.outputs.files.singleFile) +
+            configurations.testRuntimeClasspath -
+            files(sourceSets.main.output.classesDirs) +
+            sourceSets.test.output
+}
+
+afterEvaluate {
+    if (JavaVersion.current().getMajorVersion().toInteger() in (17..24)) {
+        publishing.publications.findByName('maven').artifact(proguard.outputs.files.singleFile) {
+            classifier = "standalone"
+        }
+
+        signMavenPublication.dependsOn proguard
+        publishMavenPublicationToMavenLocal.dependsOn proguard
+        publishMavenPublicationToMavenCentralRepository.dependsOn proguard
+    }
+}
+
+uberjar.dependsOn ":moco-core:jar"
+
+def javaModPath() {
+    System.properties["java.home"] + '/jmods'
+}
+
+def findTestJar(String prefix) {
+    configurations.testRuntimeClasspath.filter { it.name.startsWith(prefix) }
+}

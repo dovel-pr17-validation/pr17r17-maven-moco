@@ -1,0 +1,62 @@
+package com.github.dreamhead.moco;
+
+import org.apache.hc.client5.http.HttpResponseException;
+import org.apache.hc.core5.http.ClassicHttpResponse;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import com.github.dreamhead.moco.util.HttpHeaders;
+
+import static com.github.dreamhead.moco.helper.RemoteTestUtils.remoteUrl;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+public class MocoMountStandaloneTest extends AbstractMocoStandaloneTest {
+    @Test
+    public void should_mount_dir_to_uri() throws IOException {
+        runWithConfiguration("mount.json");
+        assertThat(helper.get(remoteUrl("/mount/mount.response")), is("response from mount"));
+    }
+
+    @Test
+    public void should_mount_dir_to_uri_with_include() throws IOException {
+        runWithConfiguration("mount.json");
+        assertThat(helper.get(remoteUrl("/mount-include/mount.response")), is("response from mount"));
+    }
+
+    @Test
+    public void should_return_non_inclusion() throws IOException {
+        runWithConfiguration("mount.json");
+        assertThrows(HttpResponseException.class, () -> {
+            helper.get(remoteUrl("/mount-include/foo.bar"));
+        });
+
+    }
+
+    @Test
+    public void should_mount_dir_to_uri_with_exclude() throws IOException {
+        runWithConfiguration("mount.json");
+        assertThat(helper.get(remoteUrl("/mount-exclude/foo.bar")), is("foo.bar"));
+    }
+
+    @Test
+    public void should_return_exclusion() {
+        runWithConfiguration("mount.json");
+        assertThrows(HttpResponseException.class, () -> {
+            helper.get(remoteUrl("/mount-exclude/mount.response"));
+        });
+
+    }
+
+    @Test
+    public void should_mount_dir_to_uri_with_response() throws IOException {
+        runWithConfiguration("mount.json");
+
+        ClassicHttpResponse httpResponse = helper.getResponse(remoteUrl("/mount-response/mount.response"));
+        String value = httpResponse.getFirstHeader(HttpHeaders.CONTENT_TYPE).getValue();
+        assertThat(value, is("text/plain"));
+        String content = new String(httpResponse.getEntity().getContent().readAllBytes());
+        assertThat(content, is("response from mount"));
+    }
+}

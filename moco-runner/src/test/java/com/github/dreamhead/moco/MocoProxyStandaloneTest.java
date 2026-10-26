@@ -1,0 +1,228 @@
+package com.github.dreamhead.moco;
+
+import com.github.dreamhead.moco.helper.SseTestHelper;
+import com.github.dreamhead.moco.sse.SseEvent;
+import org.junit.jupiter.api.Test;
+
+import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
+import static com.github.dreamhead.moco.helper.RemoteTestUtils.remoteUrl;
+import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+public class MocoProxyStandaloneTest extends AbstractMocoStandaloneTest {
+    @Test
+    public void should_response_with_proxy() throws IOException {
+        runWithConfiguration("proxy.json");
+        String content = helper.get(remoteUrl("/proxy"));
+        assertThat(content, is("proxy_target"));
+    }
+
+    @Test
+    public void should_failover() throws IOException {
+        runWithConfiguration("proxy.json");
+        String content = helper.postContent(remoteUrl("/failover"), "proxy");
+        assertThat(content, is("proxy"));
+    }
+
+    @Test
+    public void should_playback() throws IOException {
+        runWithConfiguration("proxy.json");
+        String content = helper.postContent(remoteUrl("/playback"), "proxy");
+        assertThat(content, is("proxy"));
+    }
+
+    @Test
+    public void should_batch_proxy() throws IOException {
+        runWithConfiguration("proxy_batch.json");
+        String content1 = helper.get(remoteUrl("/proxy/1"));
+        assertThat(content1, is("target_1"));
+        String content2 = helper.get(remoteUrl("/proxy/2"));
+        assertThat(content2, is("target_2"));
+    }
+
+    @Test
+    public void should_throw_exception_if_proxy_has_both_url_and_batch() {
+        assertThrows(RuntimeException.class, () -> {
+            runWithConfiguration("proxy_error_multiple_mode.json");
+        });
+
+    }
+
+    @Test
+    public void should_throw_exception_if_from_is_missing() {
+        assertThrows(RuntimeException.class, () -> {
+            runWithConfiguration("proxy_error_from_missing.json");
+        });
+    }
+
+    @Test
+    public void should_throw_exception_if_to_is_missing() {
+        assertThrows(RuntimeException.class, () -> {
+            runWithConfiguration("proxy_error_to_missing.json");
+        });
+    }
+
+    @Test
+    public void should_failover_for_batch_proxy() throws IOException {
+        runWithConfiguration("proxy_batch.json");
+        String content = helper.postContent(remoteUrl("/failover/1"), "proxy");
+        assertThat(content, is("proxy"));
+    }
+
+    @Test
+    public void should_batch_proxy_from_server() throws IOException {
+        runWithConfiguration("proxy_server.json");
+        String content1 = helper.get(remoteUrl("/proxy/1"));
+        assertThat(content1, is("target_1"));
+        String content2 = helper.get(remoteUrl("/proxy/2"));
+        assertThat(content2, is("target_2"));
+    }
+
+    @Test
+    public void should_batch_proxy_with_failover_from_server() throws IOException {
+        runWithConfiguration("proxy_server.json");
+        String content = helper.postContent(remoteUrl("/failover/1"), "proxy");
+        assertThat(content, is("proxy"));
+    }
+
+    @Test
+    public void should_not_proxy_from_server_with_url() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            runWithConfiguration("proxy_error_url_from_server.json");
+        });
+    }
+
+    @Test
+    public void should_response_with_proxy_template_url() throws IOException {
+        runWithConfiguration("proxy.json");
+        String content = helper.get(remoteUrl("/template-url?foo=target"));
+        assertThat(content, is("proxy_target"));
+    }
+
+    @Test
+    public void should_response_with_failover_status() throws IOException {
+        runWithConfiguration("proxy.json");
+        String content = helper.get(remoteUrl("/failover-with-status"));
+        assertThat(content, is("proxy"));
+
+        content = helper.get(remoteUrl("/failover-with-status"));
+        assertThat(content, is("proxy"));
+    }
+
+    @Test
+    public void should_proxy_sse_events() throws Exception {
+        runWithConfiguration("proxy.json");
+
+        try (SseTestHelper sse = new SseTestHelper(helper.getClient(), remoteUrl("/sse-proxy"))) {
+            assertThat(sse.getHeader("Content-Type"), is("text/event-stream"));
+
+            SseEvent event1 = sse.readNextEvent();
+            assertThat(event1.toEventString(), containsString("event: message"));
+            assertThat(event1.toEventString(), containsString("data: Hello"));
+
+            SseEvent event2 = sse.readNextEvent();
+            assertThat(event2.toEventString(), containsString("event: message"));
+            assertThat(event2.toEventString(), containsString("data: World"));
+        }
+    }
+
+    @Test
+    public void should_proxy_sse_events_with_delay() throws Exception {
+        int delay = 100;
+        int delta = 10;
+        runWithConfiguration("proxy.json");
+
+        try (SseTestHelper sse = new SseTestHelper(helper.getClient(), remoteUrl("/sse-proxy-delay"))) {
+            sse.readNextEvent();
+
+            long between1and2 = System.currentTimeMillis();
+            sse.readNextEvent();
+            long elapsed = System.currentTimeMillis() - between1and2;
+
+            assertThat("Delay between proxied events should be preserved",
+                    elapsed, greaterThanOrEqualTo((long) delay - delta));
+        }
+    }
+
+    @Test
+    public void should_failover_with_sse_events() throws Exception {
+        runWithConfiguration("proxy_sse_failover.json");
+
+        try (SseTestHelper sse = new SseTestHelper(helper.getClient(), remoteUrl("/sse-proxy-failover"))) {
+            assertThat(sse.getHeader("Content-Type"), is("text/event-stream"));
+
+            SseEvent event1 = sse.readNextEvent();
+            assertThat(event1.toEventString(), containsString("event: message"));
+            assertThat(event1.toEventString(), containsString("data: Hello"));
+
+            SseEvent event2 = sse.readNextEvent();
+            assertThat(event2.toEventString(), containsString("event: message"));
+            assertThat(event2.toEventString(), containsString("data: World"));
+        }
+    }
+
+    @Test
+    public void should_failover_with_partial_sse_events() throws Exception {
+        runWithConfiguration("proxy_sse_failover_partial.json");
+
+        try (SseTestHelper sse = new SseTestHelper(helper.getClient(), remoteUrl("/sse-proxy-partial"))) {
+            SseEvent event1 = sse.readNextEvent();
+            assertThat(event1.toEventString(), containsString("data: Hello"));
+        }
+
+        // KNOWN LIMITATION: In runner standalone mode, when proxy URL points to
+        // another endpoint in the same configuration, the proxy server may continue
+        // reading events from the target even after client disconnects.
+        // This is different from core test behavior where server.stop() in finally
+        // block properly interrupts the stream.
+        // The core test (MocoProxyTest.should_failover_with_partial_sse_events)
+        // correctly validates partial SSE failover recording.
+
+        String failoverContent = new String(Files.readAllBytes(Paths.get("src/test/resources/standalone_sse_failover_partial.json")), Charset.defaultCharset());
+        assertThat("Failover file should contain SSE events", failoverContent, containsString("sseEvents"));
+        assertThat(failoverContent, containsString("Hello"));
+    }
+
+    @Test
+    public void should_playback_sse_events() throws Exception {
+        runWithConfiguration("proxy_sse_failover.json");
+
+        try (SseTestHelper sse = new SseTestHelper(helper.getClient(), remoteUrl("/sse-proxy-playback"))) {
+            assertThat(sse.getHeader("Content-Type"), is("text/event-stream"));
+
+            SseEvent event1 = sse.readNextEvent();
+            assertThat(event1.toEventString(), containsString("event: message"));
+            assertThat(event1.toEventString(), containsString("data: Hello"));
+
+            SseEvent event2 = sse.readNextEvent();
+            assertThat(event2.toEventString(), containsString("event: message"));
+            assertThat(event2.toEventString(), containsString("data: World"));
+        }
+    }
+
+    @Test
+    public void should_proxy_sse_events_with_delay_and_failover() throws Exception {
+        runWithConfiguration("proxy_sse_failover_delay.json");
+
+        int delay = 100;
+        int delta = 10;
+
+        try (SseTestHelper sse = new SseTestHelper(helper.getClient(), remoteUrl("/sse-proxy-delay"))) {
+            sse.readNextEvent();
+
+            long between1and2 = System.currentTimeMillis();
+            sse.readNextEvent();
+            long elapsed = System.currentTimeMillis() - between1and2;
+
+            assertThat("Delay between proxied events should be preserved",
+                    elapsed, greaterThanOrEqualTo((long) delay - delta));
+        }
+    }
+}

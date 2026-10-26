@@ -1,0 +1,47 @@
+package com.github.dreamhead.moco;
+
+import com.github.dreamhead.moco.helper.MocoTestHelper;
+import com.github.dreamhead.moco.runner.JsonRunner;
+import com.github.dreamhead.moco.util.Resources;
+import org.junit.jupiter.api.AfterEach;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.Arrays;
+import java.util.List;
+
+import static com.github.dreamhead.moco.bootstrap.arg.HttpArgs.httpArgs;
+import static com.github.dreamhead.moco.helper.RemoteTestUtils.port;
+import static com.github.dreamhead.moco.runner.JsonRunner.newJsonRunnerWithStreams;
+
+public class AbstractMocoStandaloneTest {
+    protected final MocoTestHelper helper = new MocoTestHelper();
+    protected JsonRunner runner;
+
+    @AfterEach
+    public void teardown() {
+        if (runner != null) {
+            runner.stop();
+        }
+    }
+
+    protected void runWithConfiguration(final String... resourceNames) {
+        runner = newRunner(resourceNames);
+        runner.run();
+    }
+
+    private JsonRunner newRunner(final String[] resourceNames) {
+        final List<InputStream> streams = Arrays.stream(resourceNames)
+                .map(this::resourceAsStream)
+                .toList();
+        return newJsonRunnerWithStreams(streams, httpArgs().withPort(port()).build());
+    }
+
+    private InputStream resourceAsStream(String resourceName) {
+        try {
+            return Resources.getResource(resourceName).openStream();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

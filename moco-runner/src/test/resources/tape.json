@@ -1,0 +1,21 @@
+{
+  "content" : {
+    "tape-foo" : {
+      "content" : {
+        "content" : "Zm9v",
+        "charset" : "UTF-8"
+      },
+      "headers" : {
+        "Connection" : [ "keep-alive" ],
+        "Host" : [ "localhost:12306" ],
+        "Accept-Encoding" : [ "gzip, x-gzip, deflate" ],
+        "Content-Length" : [ "3" ],
+        "Content-Type" : [ "text/plain; charset=UTF-8" ]
+      },
+      "method" : "POST",
+      "queries" : { },
+      "uri" : "/record-tape",
+      "version" : "HTTP/1.1"
+    }
+  }
+}

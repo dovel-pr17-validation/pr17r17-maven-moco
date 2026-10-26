@@ -1,0 +1,18 @@
+package com.github.dreamhead.moco.config;
+
+import com.github.dreamhead.moco.MocoConfig;
+import com.github.dreamhead.moco.ResponseHandler;
+
+import static com.github.dreamhead.moco.handler.AndResponseHandler.and;
+
+public record MocoResponseConfig(ResponseHandler handler) implements MocoConfig<ResponseHandler> {
+    @Override
+    public boolean isFor(final String id) {
+        return RESPONSE_ID.equalsIgnoreCase(id);
+    }
+
+    @Override
+    public ResponseHandler apply(final ResponseHandler target) {
+        return and(handler, target);
+    }
+}

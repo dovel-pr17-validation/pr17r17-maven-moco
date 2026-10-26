@@ -1,0 +1,7 @@
+plugins {
+    id "com.vanniktech.maven.publish" version "${mavenPublishVersion}" apply false
+}
+
+wrapper {
+    gradleVersion = '9.8.1'
+}

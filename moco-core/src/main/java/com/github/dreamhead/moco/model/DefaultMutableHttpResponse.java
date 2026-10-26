@@ -1,0 +1,146 @@
+package com.github.dreamhead.moco.model;
+
+import com.github.dreamhead.moco.HttpProtocolVersion;
+import com.github.dreamhead.moco.HttpRequest;
+import com.github.dreamhead.moco.MutableHttpResponse;
+import com.github.dreamhead.moco.sse.SseEvent;
+import com.github.dreamhead.moco.util.HttpHeaders;
+import com.github.dreamhead.moco.util.Maps;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.HttpResponseStatus;
+import io.netty.handler.codec.http.HttpVersion;
+
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
+public final class DefaultMutableHttpResponse implements MutableHttpResponse {
+    private HttpProtocolVersion version;
+    private Map<String, String[]> headers = new HashMap<>();
+    private int status;
+    private MessageContent content;
+    private Iterable<SseEvent> sseEvents;
+
+    private DefaultMutableHttpResponse() {
+    }
+
+    @Override
+    public void setVersion(final HttpProtocolVersion version) {
+        this.version = version;
+    }
+
+    @Override
+    public void setStatus(final int status) {
+        this.status = status;
+    }
+
+    @Override
+    public void setContent(final MessageContent content) {
+        if (this.content != null) {
+            throw new IllegalArgumentException("Content has been set");
+        }
+
+        this.content = content;
+    }
+
+    private static final Set<String> SINGLE_VALUE_HEADERS =
+            Set.of(HttpHeaders.CONTENT_TYPE);
+
+    @Override
+    public void addHeader(final String name, final Object value) {
+        if (this.headers.containsKey(name) && isSingleValueHeader(name)) {
+            this.headers.remove(name);
+        }
+
+        doAddHeader(name, value);
+    }
+
+    private boolean isSingleValueHeader(final String name) {
+        return SINGLE_VALUE_HEADERS.stream()
+                .anyMatch(header -> header.equalsIgnoreCase(name));
+    }
+
+    private void doAddHeader(final String name, final Object value) {
+        this.headers.put(name, newValues(name, value));
+    }
+
+    private String[] newValues(final String name, final Object value) {
+        if (this.headers.containsKey(name)) {
+            String[] values = this.headers.get(name);
+            String[] result = Arrays.copyOf(values, values.length + 1);
+            result[values.length] = value.toString();
+            return result;
+        }
+
+        return new String[]{value.toString()};
+    }
+
+    @Override
+    public String getHeader(final String name) {
+        if (!this.headers.containsKey(name)) {
+            return null;
+        }
+
+        String[] values = this.headers.get(name);
+        return values[0];
+    }
+
+    @Override
+    public HttpProtocolVersion getVersion() {
+        return this.version;
+    }
+
+    @Override
+    public Map<String, String[]> getHeaders() {
+        return Maps.orderedCopyOf(this.headers);
+    }
+
+    @Override
+    public int getStatus() {
+        return this.status;
+    }
+
+    @Override
+    public MessageContent getContent() {
+        return this.content;
+    }
+
+    public static DefaultMutableHttpResponse newResponse(final HttpRequest request, final int status) {
+        DefaultMutableHttpResponse httpResponse = new DefaultMutableHttpResponse();
+        httpResponse.version = request.getVersion();
+        httpResponse.status = status;
+        return httpResponse;
+    }
+
+    public boolean isSse() {
+        return sseEvents != null;
+    }
+
+    public Iterable<SseEvent> getSseEvents() {
+        return sseEvents;
+    }
+
+    public void setSseEvents(final Iterable<SseEvent> events) {
+        this.sseEvents = events;
+    }
+
+    public FullHttpResponse toFullResponse() {
+        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.valueOf(this.version.text()),
+                HttpResponseStatus.valueOf(this.status));
+
+        for (Map.Entry<String, String[]> entry : getHeaders().entrySet()) {
+            String key = entry.getKey();
+            for (String value : entry.getValue()) {
+                response.headers().add(key, value);
+            }
+        }
+
+        if (this.content != null) {
+            response.content().writeBytes(this.content.getContent());
+        }
+
+        return response;
+    }
+}

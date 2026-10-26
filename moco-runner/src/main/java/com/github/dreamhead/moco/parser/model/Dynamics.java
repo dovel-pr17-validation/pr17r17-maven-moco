@@ -1,0 +1,112 @@
+package com.github.dreamhead.moco.parser.model;
+
+import com.github.dreamhead.moco.Moco;
+import com.github.dreamhead.moco.RequestExtractor;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.function.Predicate;
+import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+public class Dynamics {
+    private static final Map<String, String> EXTRACTORS = Map.of(
+            "headers", "header",
+            "queries", "query",
+            "xpaths", "xpath",
+            "jsonPaths", "jsonPath",
+            "cookies", "cookie",
+            "forms", "form");
+
+    protected final Predicate<Field> isClassField() {
+        return field -> "class".equals(field.getName());
+    }
+
+    protected final Predicate<Field> isFinalField() {
+        return field -> Modifier.isFinal(field.getModifiers());
+    }
+
+    protected final <T> Predicate<Field> fieldExist(final T target) {
+        return field -> {
+            try {
+                return field.get(target) != null;
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
+            }
+        };
+    }
+
+    protected final Iterable<Field> getFields(final Class<?> clazz) {
+        List<Field> fieldsForCurrent = getFieldsForCurrent(clazz);
+        if (clazz.getSuperclass() == null) {
+            return fieldsForCurrent;
+        }
+
+        return Stream.concat(
+                StreamSupport.stream(getFields(clazz.getSuperclass()).spliterator(), false),
+                fieldsForCurrent.stream()).toList();
+    }
+
+    private List<Field> getFieldsForCurrent(final Class<?> clazz) {
+        return Arrays.stream(clazz.getDeclaredFields())
+                .map(field -> {
+                    field.setAccessible(true);
+                    return field;
+                })
+                .toList();
+    }
+
+    protected final <T> Predicate<Field> isValidField(final T target) {
+        return isClassField().or(isFinalField()).negate().and(fieldExist(target));
+    }
+
+    public static <T> T invokeTarget(final String name, final Object value, final Class<T> clazz) {
+        return invokeTarget(name, value, clazz, value.getClass());
+    }
+
+    public static <T> T invokeTarget(final String name, final Object value,
+                                     final Class<T> clazz, final Class<?> argClass) {
+        try {
+            Method method = Moco.class.getMethod(name, argClass);
+            Object result = method.invoke(null, value);
+            return clazz.cast(result);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static <T> T invokeTarget(final String name, final Object arg1, final Object arg2,
+                                     final Class<T> clazz, final Class<?> arg1Class, final Class<?> arg2Class) {
+        try {
+            Method method = Moco.class.getMethod(name, arg1Class, arg2Class);
+            Object result = method.invoke(null, arg1, arg2);
+            return clazz.cast(result);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected static Method getExtractorMethod(final String name) {
+        try {
+            if (EXTRACTORS.containsKey(name)) {
+                return Moco.class.getMethod(EXTRACTORS.get(name), String.class);
+            }
+
+            throw new RuntimeException("No [" + name + "] extractor found");
+        } catch (NoSuchMethodException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    protected static RequestExtractor createRequestExtractor(final Method method, final String key) {
+        try {
+            return RequestExtractor.class.cast(method.invoke(null, key));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+}

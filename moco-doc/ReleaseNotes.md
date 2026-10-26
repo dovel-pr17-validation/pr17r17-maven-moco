@@ -1,0 +1,432 @@
+# Release 2.0.0(unreleased)
+
+## Breaking changes
+
+* **A BREAK CHANGE**: remove socket api
+* **A BREAK CHANGE**: remove JUnit 4 support (`moco-junit` module). Migrate to `moco-junit5`.
+* Guava is no longer a dependency. Moco's public API no longer exposes any Guava type, which means
+  several signatures changed. **Recompilation is required** even where the source still compiles,
+  because the erased return types changed.
+  * `ImmutableMap` and `ImmutableList` in the API are now `java.util.Map` and `java.util.List`. This
+    affects `HttpMessage.getHeaders`, `HttpRequest.getQueries`, `DefaultHttpRequest.getForms`,
+    `getCookies`, `Moco.template(..., variables)`, `Jsons.toObjects`, `Globs.glob`,
+    `Configs.configItems`, `SettingFetcher.getSettings` and the `RunnerSetting`/parser types.
+    Code that stored a result in an `ImmutableMap`/`ImmutableList` variable, or that *implements*
+    `HttpMessage`, `HttpRequest`, `Content` or `SettingFetcher`, must be updated.
+  * `MediaType` moved from `com.google.common.net.MediaType` to
+    `com.github.dreamhead.moco.util.MediaType`. It keeps `create`, `parse`, `type`, `subtype`,
+    `charset`, `withCharset` and the constants Moco used, and renders identically on the wire.
+    `charset()` now returns `java.util.Optional`, so a trailing `.toJavaUtil()` should be dropped.
+  * `FileContentType.DEFAULT_CONTENT_TYPE_WITH_CHARSET` changes type accordingly.
+  * `CookiesRequestExtractor` and `FormsRequestExtractor` now extend
+    `HttpRequestExtractor<Map<String, String>>`.
+* `MocoMonitor` no longer carries Guava's `@Subscribe` on its methods. Moco has had no `EventBus`
+  since 2013, so this changes nothing inside Moco. It *does* matter if you registered a
+  `MocoMonitor` on your own Guava `EventBus`, because Guava resolves `@Subscribe` through
+  interfaces: those methods will now silently never be registered, with **no compile error**.
+  Annotate your own overrides with `@Subscribe` instead.
+
+## APIs
+
+* HTTP 2 Support
+
+## Implementation Details
+
+* Removed the Guava dependency from all modules. The standalone jar shrinks by roughly 210 KB and
+  the uber jar by about 3 MB.
+* `org.jspecify:jspecify` is now declared explicitly as `compileOnly`; it previously arrived only
+  as a transitive dependency of Guava.
+* A `checkNoGuava` verification task now fails the build if Guava is reimported.
+
+# Release 1.6.1(2-May-2026)
+
+## APIs
+* SSE event delay semantics changed: delay affects current event self.
+
+## Implementation Details
+* SSE support in proxy failover
+
+# Release 1.6.0(20-Apr-2026)
+
+## APIs
+* `sse` API for Server-Sent Events streaming support
+  * `event` for named SSE event
+  * `data` for anonymous SSE event
+  * `sse(...).delay(ms)` for global delay between all events
+  * `sse(...).delay(duration, TimeUnit)` for global delay with time unit
+  * Event modifiers: `id`, `retry`, `delay`
+  * `event.delay(duration, TimeUnit)` for event delay with time unit
+* SSE events from file
+* SSE proxy: proxy forwards SSE streams from remote server
+* SSE JSON API
+  * Array format for inline events
+  * Object format with `delay` and `events`
+  * Object format with `delay` as `{duration, unit}` for time unit
+  * File format with `delay`
+
+## Implementation Details
+* Replace logback with tinylog
+* Optimize ProGuard configuration to exclude unused resources
+
+# Release 1.5.0(1-Sep-2023)
+## APIs
+* `req.client.port` is supported in template
+* `sameSite` cookie attribute is supported
+* `cors` in response is supported for CORS
+  * `allowOrigin`(Access-Control-Allow-Credentials)
+  * `allowCredentials`(Access-Control-Allow-Credentials)
+  * `exposeHeaders`(Access-Control-Expose-Headers)
+  * `maxAge`(Access-Control-Max-Age)
+  * `allowMethods`(Access-Control-Allow-Methods)
+  * `allowHeaders`(Access-Control-Allow-Headers)
+
+# Release 1.4.0 (1-Dec-2022)
+## APIs
+* `path` is introduced for uri
+* `req.xml` is supported in template
+* `req.client.address` is supported in template
+* `req.path` is supported in template
+
+## CLI
+* add `-q` for quiet mode in standalone server  
+
+## Implementation Details
+* enhance log with query parameters
+* event action log is supported
+
+# Release 1.3.0 (1-Jan-2022)
+## APIs
+* `conditional` Java API allows you to write your own matcher
+* `random` template function supports start and end as range
+* `struct` API for JSON and XML which matches only struct no matter what content is. 
+
+## Implementation Details
+* restart with configuration when new configuration is illegal. #304
+* enhance log with query parameters
+* `xml` returns ContentResource which is **A BREAK CHANGE**.
+
+# Release 1.2.0 (1-Apr-2021)
+
+## Websocket
+* `connected` API return content when client connects to websocket server
+* `request` match request content 
+* `response` return response content
+* `join` add client to specific group
+* `broadcast` broadcast message to all subscriber.
+  * `group` broadcast message to specific group
+
+## APIs
+* `transform` Java API allows you transform your content.
+* `binary` Java API return binary message.
+* `json` Java API return pojo dynamically.
+* `text`, `binary`, `json`, `var` with function, Java API allows you write your own response content. 
+
+## Implementation Details
+* Return application/json header for `json` API with text and resource. 
+
+# Release 1.1.0 (1-Mar-2020)
+
+* Upgrade minimal Java version to Java 8.
+
+## APIs
+* `record` and `replay` support dynamic stub server.
+  * `group`
+  * `identifier`
+  * `modifier`
+  * `tape`
+
+# Release 1.0.0 (1-Sep-2019)
+
+## APIs
+* `cycle` API returns response as a cycle.
+* `now` as template function is supported in template
+* `random` as template function is supported in template
+* `req.json` is supported in template
+* `failover` and `playback` status API is supported.
+* `header` returns HttpHeader instead of ResponseHandler.
+* `get` and `post` for event action supports HTTP header.
+
+## Implementation Details
+* Support multiple HTTP headers with same name
+* Support proxy PATCH method
+* Dump HTTP message even if Content Length header is missing
+
+# Release 0.12.0 (24-Dec-2017)
+
+* Upgrade minimal Java version to Java 7
+
+## APIs
+* `json` API returns resource, so it can be used for both request and response.
+* `and` API for Response Handler
+
+## JSON APIs
+* `seq` is supported finally
+* `json` in Post event
+
+## Global Settings
+* Glob syntax is supported for include files in global setting
+
+## CLI
+* Glob syntax is supported for CLI '-c' argument
+
+# Release 0.11.1 (12-Jun-2017)
+
+## APIs
+* Template for Event action
+* Remove publish API with Optional, e.g. file and pathResource
+* Proxy with content resource as url
+* Add cookie attribute API
+
+## JUnit
+* HTTPS JUnit runner for POJO, JSON and from path resource
+* Http JSON runner with path resource
+* Socket JSON runner with path resource
+
+## Implementation Details
+* Fix: get Moco standalone version from manifest
+* Fix: merge server with port
+* Fix: set charset from http request
+* Fix: parse json with charset
+* Fix: fail to load configuration with multiple modification
+* Fix: allowed empty query
+* Fix: make request hit and moco monitor thread safe
+* Fix: parse form with charset
+
+# Release 0.11.0 (20-May-2016)
+ 
+## Usage
+* JUnit Integration
+
+## APIs
+### REST API
+* get
+* post
+* put
+* delete
+* head
+* patch
+* sub-resource
+* any id
+
+## Implementation Details
+* Fix: response handler case issue
+* Write JSON content to log
+* Fix: empty content for jsonpath
+* Fix: empty content for xpath
+
+# Release 0.10.2 (1-Sep-2015)
+
+## APIs
+* **toJson** will convert POJO to JSON text in response handler
+* **json** with pojo will convert POJO to JSON text in request matcher
+* **socketServer** without port
+* **socketServer** with monitor, e.g. logging and verification
+* Template as **redirect** target 
+
+## Implementation Details
+* Enhance log dumper with MediaType implementation
+* Enhance socket server implementation with byte buf, rather than string
+* Fix charset issue in toJson
+* Enhance file content type with MediaType implementation
+* Same name query has been supported
+
+# Release 0.10.1 (1-May-2015)
+
+## APIs
+* Use **httpServer** as API, and **httpserver** has been deprecated, will be removed at next release.
+* File and path resource with charset
+* Latency with time unit, and latency without time unit has been deprecated, will be removed at next release
+* Log file with charset
+* Template as filename for file and path resource
+
+## JSON APIs
+* Mount with response setting
+
+## Global Settings
+* Request
+
+## Implementation Details
+* File and path resource read as byte array to fix file encoding issue
+* JSON path and XPath in template will return many objects.
+* Changed template extractor name to singular in JSON API, e.g. json_paths to **json_path**, xpaths to **xpath**.
+
+# Release 0.10.0 (1-Dec-2014)
+
+## Usage
+* Socket support
+* Version query
+* Start arguments have been changed from start to HTTP(HTTPS, Socket) etc.
+
+## APIs
+* Attachment
+
+## Runner API
+* server by JSON configuration
+
+## Template
+* Template extractor support
+
+## Shell
+* Added version argument
+
+## Potential Breaks
+* JSON Path, because new version JSON Path implementation has been introduced.
+
+# Release 0.9.2 (1-Jul-2014)
+
+## Usage
+* (Beta) HTTPS support
+
+## APIs
+* Http Protocol Version in Java API.
+* More operators:
+** startsWith
+** endsWith
+** contain
+** exist
+* between for verifier
+* Added multiple monitors for server creation.
+
+## JSON APIs
+* json text shortcut
+
+### Template
+* change template variables from Object to String.
+  (API users have to decide how to display their vars).
+* JSON request/response shortcut in JSON configuration.
+
+# Release 0.9.1 (1-Feb-2014)
+## Usage
+* Runner API
+* (Beta) gmoco, moco groovy shell
+
+## APIs
+* log to record request
+* once for verifier
+* batch proxy
+* proxy playback
+
+### Template
+* cookie
+* form
+* template variables
+
+### Global Settings
+* Response
+
+## Implementation Details
+* Fixed "uri" in failover to remove query parameter.
+* Used Proguard to minimize standalone jar
+
+## Fixes
+* Keep connect alive if request wants to keep alive
+* NPE for validating form/content in request hit
+* NPE for XPath matcher
+* Wait server to shutdown completely
+
+# Release 0.9 (1-Nov-2013)
+
+## APIs
+* Request Hit as verifier
+* Event API
+** Event: Complete
+** Event Action: Get/Post URL
+* Turned off log for API by default
+* seq API with response handler
+* Added shortcut for PUT and DELETE method
+
+## Implementation Details
+* Server can select available port(start/shutdown) without providing no port.
+* Changed "statusCode" in failover to "status". Please changed your failover file if your tests failed.
+
+# Release 0.8.1 (1-August-2013)
+* Upgrade to Netty 4
+* Fixed proxy bug
+
+# Release 0.8 (21-July-2013)
+
+## Usage
+* global setting file
+
+## APIs
+### Request
+* JSONPath
+
+### Response
+#### Integration
+* proxy
+* with
+* (Beta) template
+* removed url (using proxy instead)
+* removed content (using with instead)
+
+#### Misc Response
+* removed cache
+
+#### Template
+* version
+* method
+* content
+* header
+* query
+
+## Global Settings
+* context
+* file root
+* environment
+
+# Release 0.7 (1-May-2013)
+
+the first public release of Moco
+
+## Usage
+* API
+* standalone server
+* shell
+* maven plugin (external)
+* gradle plugin (external)
+
+## APIs
+
+### Request
+
+#### HTTP
+* content(text, file)
+* URI
+* query Parameter
+* HTTP method
+* version
+* header
+* redirect
+
+#### Operator
+* eq
+* match
+
+#### Web
+* cookie
+* form
+
+#### Integration
+* XML
+* XPath
+* JSON
+
+### Response
+
+#### HTTP
+* content(text, file)
+* version
+* status code
+* header
+
+#### Integration
+* url
+
+#### Misc Response
+* latency
+* sequence(API only)
+* cache
+
+### Misc
+* mount

@@ -1,0 +1,34 @@
+[ {
+  "request" : {
+    "content" : "",
+    "headers" : {
+      "content-length" : [ "0" ],
+      "Connection" : [ "keep-alive" ],
+      "Host" : [ "localhost:12306" ],
+      "Accept-Encoding" : [ "gzip, x-gzip, deflate" ]
+    },
+    "method" : "GET",
+    "queries" : { },
+    "uri" : "/sse-proxy-delay",
+    "version" : "HTTP/1.1"
+  },
+  "response" : {
+    "content" : null,
+    "headers" : { },
+    "sseEvents" : [ {
+      "id" : null,
+      "event" : "message",
+      "data" : [ "first" ],
+      "retry" : null,
+      "delay" : 0
+    }, {
+      "id" : null,
+      "event" : "message",
+      "data" : [ "second" ],
+      "retry" : null,
+      "delay" : 0
+    } ],
+    "status" : 200,
+    "version" : "HTTP/1.1"
+  }
+} ]

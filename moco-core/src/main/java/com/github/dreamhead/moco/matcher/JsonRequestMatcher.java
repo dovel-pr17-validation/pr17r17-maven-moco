@@ -1,0 +1,55 @@
+package com.github.dreamhead.moco.matcher;
+
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import com.github.dreamhead.moco.MocoConfig;
+import com.github.dreamhead.moco.Request;
+import com.github.dreamhead.moco.RequestMatcher;
+import com.github.dreamhead.moco.extractor.ContentRequestExtractor;
+import com.github.dreamhead.moco.model.MessageContent;
+import com.github.dreamhead.moco.resource.Resource;
+
+import java.util.Optional;
+
+public abstract class JsonRequestMatcher extends AbstractRequestMatcher {
+    protected abstract boolean doMatch(JsonNode actual, JsonNode expected);
+    protected abstract RequestMatcher newApplyMatcher(Resource appliedResource, ContentRequestExtractor extractor);
+
+    private final ContentRequestExtractor extractor;
+    private final ObjectMapper mapper;
+    private final Resource expected;
+
+    public JsonRequestMatcher(final Resource expected, final ContentRequestExtractor extractor) {
+        this.extractor = extractor;
+        this.expected = expected;
+        this.mapper = new ObjectMapper();
+    }
+
+    @Override
+    public final boolean match(final Request request) {
+        Optional<MessageContent> content = extractor.extract(request);
+        return content.filter(messageContent -> doMatch(request, messageContent))
+                .isPresent();
+    }
+
+    private boolean doMatch(final Request request, final MessageContent content) {
+        try {
+            JsonNode actual = mapper.readTree(content.toString());
+            JsonNode expected = mapper.readTree(this.expected.readFor(request).toString());
+            return doMatch(actual, expected);
+        } catch (JacksonException jpe) {
+            return false;
+        }
+    }
+
+    @Override
+    public final RequestMatcher doApply(final MocoConfig config) {
+        Resource appliedResource = this.expected.apply(config);
+        if (appliedResource == this.expected) {
+            return this;
+        }
+
+        return newApplyMatcher(appliedResource, this.extractor);
+    }
+}

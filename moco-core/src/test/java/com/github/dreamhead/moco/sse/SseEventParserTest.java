@@ -1,0 +1,111 @@
+package com.github.dreamhead.moco.sse;
+
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+import java.util.stream.StreamSupport;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.is;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
+public class SseEventParserTest {
+    private final SseEventParser parser = new SseEventParser();
+
+    private List<SseEvent> parse(final String content) {
+        return StreamSupport.stream(parser.parse(List.of(content.split("\n", -1))).spliterator(), false)
+                .toList();
+    }
+
+    @Test
+    public void should_parse_single_event() {
+        List<SseEvent> events = parse("""
+                event: message
+                data: Hello
+                """);
+        assertThat(events.size(), is(1));
+        assertThat(events.get(0).toEventString(), containsString("event: message"));
+        assertThat(events.get(0).toEventString(), containsString("data: Hello"));
+    }
+
+    @Test
+    public void should_parse_multiple_events() {
+        List<SseEvent> events = parse("""
+                event: message
+                data: Hello
+
+                event: message
+                data: World
+                """);
+        assertThat(events.size(), is(2));
+    }
+
+    @Test
+    public void should_parse_event_with_id() {
+        List<SseEvent> events = parse("""
+                id: 1
+                data: Hello
+                """);
+        assertThat(events.size(), is(1));
+        assertThat(events.get(0).toEventString(), containsString("id: 1"));
+    }
+
+    @Test
+    public void should_parse_event_with_retry() {
+        List<SseEvent> events = parse("""
+                data: Hello
+                retry: 3000
+                """);
+        assertThat(events.size(), is(1));
+        assertThat(events.get(0).toEventString(), containsString("retry: 3000"));
+    }
+
+    @Test
+    public void should_parse_multi_data_event() {
+        List<SseEvent> events = parse("""
+                data: line1
+                data: line2
+                """);
+        assertThat(events.size(), is(1));
+        assertThat(events.get(0).toEventString(), containsString("data: line1"));
+        assertThat(events.get(0).toEventString(), containsString("data: line2"));
+    }
+
+    @Test
+    public void should_throw_on_missing_data() {
+        assertThrows(IllegalArgumentException.class, () -> parse("""
+                event: message
+                """));
+    }
+
+    @Test
+    public void should_handle_empty_content() {
+        List<SseEvent> events = StreamSupport.stream(parser.parse(List.of()).spliterator(), false).toList();
+        assertThat(events.size(), is(0));
+    }
+
+    @Test
+    public void should_strip_multiple_spaces_after_colon() {
+        List<SseEvent> events = parse("""
+                data:   Hello
+                """);
+        assertThat(events.size(), is(1));
+        assertThat(events.get(0).toEventString(), containsString("data: Hello"));
+    }
+
+    @Test
+    public void should_handle_no_space_after_colon() {
+        List<SseEvent> events = parse("""
+                data:Hello
+                """);
+        assertThat(events.size(), is(1));
+        assertThat(events.get(0).toEventString(), containsString("data: Hello"));
+    }
+
+    @Test
+    public void should_handle_whitespace_only_lines() {
+        List<SseEvent> events = parse("   ");
+        assertThat(events.size(), is(0));
+    }
+}

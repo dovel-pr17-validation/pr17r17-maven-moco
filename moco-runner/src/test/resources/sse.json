@@ -1,0 +1,77 @@
+[
+   {
+      "request" : {
+         "uri" : "/sse"
+      },
+      "response" : {
+         "sse" : {
+            "file" : "src/test/resources/events.sse"
+         }
+      }
+   },
+   {
+      "request" : {
+         "uri" : "/inline"
+      },
+      "response" : {
+         "sse" : [
+            { "event": "message", "data": "Hello" },
+            { "event": "message", "data": " World" }
+         ]
+      }
+   },
+   {
+      "request" : {
+         "uri" : "/delay"
+      },
+      "response" : {
+         "sse" : [
+            { "event": "message", "data": "token1", "delay": 100 },
+            { "event": "message", "data": "token2", "delay": 100 },
+            { "event": "message", "data": "token3", "delay": 100 }
+         ]
+      }
+   },
+   {
+      "request" : {
+         "uri" : "/sse-delay"
+      },
+      "response" : {
+         "sse" : {
+            "delay": 100,
+            "events": [
+               { "event": "message", "data": "token1" },
+               { "event": "message", "data": "token2" },
+               { "event": "message", "data": "token3" }
+            ]
+         }
+      }
+   },
+   {
+      "request" : {
+         "uri" : "/sse-delay-unit"
+      },
+      "response" : {
+         "sse" : {
+            "delay": { "duration": 100, "unit": "MILLISECOND" },
+            "events": [
+               { "event": "message", "data": "token1" },
+               { "event": "message", "data": "token2" },
+               { "event": "message", "data": "token3" }
+            ]
+         }
+      }
+   },
+   {
+      "request" : {
+         "uri" : "/event-delay-unit"
+      },
+      "response" : {
+         "sse" : [
+            { "event": "message", "data": "token1", "delay": { "duration": 100, "unit": "MILLISECOND" } },
+            { "event": "message", "data": "token2", "delay": { "duration": 100, "unit": "MILLISECOND" } },
+            { "event": "message", "data": "token3" }
+         ]
+      }
+   }
+]
